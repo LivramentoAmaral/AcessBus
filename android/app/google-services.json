@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "806904878638",
+    "project_id": "acesstrans",
+    "storage_bucket": "acesstrans.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:806904878638:android:4fae7d4a12ab2547e971bf",
+        "android_client_info": {
+          "package_name": "com.example.acesstrans"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "806904878638-auud9r83o1pnpnathurctsv2r1fm5c0m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHAliIwuneL7tWg9S-DW-BwRXN1Lzo1mE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "806904878638-auud9r83o1pnpnathurctsv2r1fm5c0m.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "806904878638-c3b8h5hmt2evclofe3vsid97par7o8sn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.acesstrans"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
