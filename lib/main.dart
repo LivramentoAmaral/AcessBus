@@ -11,7 +11,7 @@ import 'package:firebase_core/firebase_core.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await HiveConfig.start(); 
-  await Firebase.initializeApp(); 
+  await Firebase.initializeApp();   
 
   runApp(
     MultiProvider(

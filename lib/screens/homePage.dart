@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http; // Importando para fazer requisições HTTP
+import 'package:http/http.dart'
+    as http; // Importando para fazer requisições HTTP
 import 'package:acesstrans/core/theme/app_themes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -23,7 +24,8 @@ class _HomePageState extends State<HomePage> {
   bool _isListening = false;
   bool _speechEnabled = false;
   String _lastWords = '';
-  LatLng _busLocation = LatLng(-10.43029, -45.174006); // Localização inicial do ônibus
+  LatLng _busLocation =
+      LatLng(-10.43029, -45.174006); // Localização inicial do ônibus
 
   @override
   void initState() {
@@ -33,25 +35,32 @@ class _HomePageState extends State<HomePage> {
 
   // Função para pegar a localização do ônibus via API
   Future<void> _fetchBusLocation() async {
-  final response = await http.get(Uri.parse('https://api-location-teal.vercel.app/api/location'));
-  
-  if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);  // Deserializa o JSON
-    print('Localização do ônibus recebida: $data');
-    
-    // Acessa a latitude e longitude dentro da chave 'location'
-    double latitude = data["location"]['latitude'];
-    double longitude = data["location"]['longitude'];
-    
-    // Atualiza a localização do ônibus no mapa
-    setState(() {
-      _busLocation = LatLng(latitude, longitude);  // Atualiza a posição no mapa
-    });
-  } else {
-    print('Falha ao carregar a localização do ônibus');
-  }
-}
+    final response = await http
+        .get(Uri.parse('https://api-location-teal.vercel.app/api/location'));
 
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body); // Deserializa o JSON
+      print('Localização do ônibus recebida: $data');
+
+      // Acessa a latitude e longitude dentro da chave 'location'
+      double latitude = data["location"]['latitude'];
+      double longitude = data["location"]['longitude'];
+
+      print('Latitude: $latitude, Longitude: $longitude');
+
+      // Verifica se as coordenadas são válidas antes de atualizar
+      if (latitude != null && longitude != null) {
+        setState(() {
+          _busLocation =
+              LatLng(latitude, longitude); // Atualiza a posição no mapa
+        });
+      } else {
+        print("Coordenadas inválidas recebidas da API.");
+      }
+    } else {
+      print('Falha ao carregar a localização do ônibus');
+    }
+  }
 
   void _initSpeech() async {
     await _requestMicrophonePermission();
@@ -154,12 +163,14 @@ class _HomePageState extends State<HomePage> {
       ),
       body: FlutterMap(
         options: MapOptions(
-          initialCenter: _busLocation,
-          initialZoom: 13.0,
+          initialCenter: _busLocation, // Centraliza no local inicial do ônibus
+          initialZoom: 13.0, // Zoom do mapa
+          maxZoom: 18.0, // Define o zoom máximo
         ),
         children: [
           TileLayer(
-            urlTemplate: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+            urlTemplate:
+                "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
             subdomains: ['a', 'b', 'c'],
           ),
           MarkerLayer(
@@ -170,7 +181,7 @@ class _HomePageState extends State<HomePage> {
                 height: 50.0,
                 child: IconButton(
                   icon: Image.network(
-                    'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+                    'https://cdn-icons-png.flaticon.com/512/3448/3448339.png', // Ícone de ônibus
                     width: 40,
                     height: 40,
                   ),
@@ -190,7 +201,8 @@ class _HomePageState extends State<HomePage> {
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              color: Theme.of(context).textTheme.bodyLarge?.color,
+                              color:
+                                  Theme.of(context).textTheme.bodyLarge?.color,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -198,7 +210,8 @@ class _HomePageState extends State<HomePage> {
                             coord['popup'],
                             style: TextStyle(
                               fontSize: 20,
-                              color: Theme.of(context).textTheme.bodyMedium?.color,
+                              color:
+                                  Theme.of(context).textTheme.bodyMedium?.color,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -207,7 +220,8 @@ class _HomePageState extends State<HomePage> {
                               child: ElevatedButton(
                                 onPressed: () => Navigator.of(context).pop(),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(context).primaryColor,
+                                  backgroundColor:
+                                      Theme.of(context).primaryColor,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
@@ -228,12 +242,12 @@ class _HomePageState extends State<HomePage> {
             }).toList()
               ..add(
                 Marker(
-                  point: _busLocation,
+                  point: _busLocation, // A localização do ônibus
                   width: 50.0,
                   height: 50.0,
                   child: IconButton(
                     icon: Image.network(
-                      'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+                      'https://cdn-icons-png.flaticon.com/512/3448/3448339.png', // Ícone de ônibus
                       width: 40,
                       height: 40,
                     ),
