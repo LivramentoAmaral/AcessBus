@@ -1,10 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:acesstrans/Constants/coordinates.dart';
 import 'package:acesstrans/core/theme/app_themes.dart';
 
@@ -17,14 +19,21 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final FlutterTts flutterTts = FlutterTts();
-  LatLng _busLocation = LatLng(-10.43029, -45.174006);
-  List<List<LatLng>> _allRoutes =
-      []; // Lista contendo todas as rotas consecutivas
+  LatLng _busLocation = LatLng(-10.43029, -45.174006); // Localização inicial
+  List<List<LatLng>> _allRoutes = [];
+  Timer? _locationUpdateTimer;
 
   @override
   void initState() {
     super.initState();
     _loadInitialRoutes(); // Carrega as rotas ao iniciar
+    _startLocationUpdates(); // Inicia a atualização automática da localização
+  }
+
+  @override
+  void dispose() {
+    _locationUpdateTimer?.cancel(); // Cancela o Timer ao sair da página
+    super.dispose();
   }
 
   Future<void> _loadInitialRoutes() async {
@@ -88,6 +97,45 @@ class _HomePageState extends State<HomePage> {
     await flutterTts.speak(text);
   }
 
+  /// Função para buscar a localização atual do ônibus via API
+  Future<LatLng> _fetchBusLocation() async {
+    try {
+      // Ignorar a verificação do certificado SSL (não recomendado para produção)
+      HttpClient client = HttpClient();
+      client.badCertificateCallback =
+          (X509Certificate cert, String host, int port) =>
+              true; // Ignora certificados inválidos
+      final ioClient = IOClient(client);
+
+      // URL da API que retorna a localização do ônibus
+      final url =
+          'https://api-location-teal.vercel.app/api/location'; // Substitua com a URL da sua API
+      final response = await ioClient.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return LatLng(
+            data["location"]['latitude'], data["location"]['longitude']);
+      } else {
+        throw Exception('Erro ao obter localização do ônibus');
+      }
+    } catch (e) {
+      print("Erro ao buscar localização do ônibus: $e");
+      return _busLocation; // Retorna a última localização conhecida
+    }
+  }
+
+  /// Função para iniciar o Timer de atualização da localização
+  void _startLocationUpdates() {
+    _locationUpdateTimer =
+        Timer.periodic(const Duration(seconds: 5), (timer) async {
+      final newLocation = await _fetchBusLocation();
+      setState(() {
+        _busLocation = newLocation; // Atualiza a localização do ônibus
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -101,12 +149,6 @@ class _HomePageState extends State<HomePage> {
       body: MapView(
         busLocation: _busLocation,
         allRoutes: _allRoutes, // Passa todas as rotas
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadInitialRoutes, // Recarregar as rotas
-        tooltip: "Recarregar rotas",
-        backgroundColor: AppThemes.lightTheme.primaryColor,
-        child: const Icon(Icons.refresh),
       ),
     );
   }
@@ -126,8 +168,9 @@ class MapView extends StatelessWidget {
   Widget build(BuildContext context) {
     return FlutterMap(
       options: MapOptions(
-        initialCenter: busLocation,
+        initialCenter: busLocation, // Usando a localização do ônibus
         initialZoom: 13.0,
+        keepAlive: true,
       ),
       children: [
         TileLayer(
@@ -137,14 +180,12 @@ class MapView extends StatelessWidget {
             'attribution': '© OpenStreetMap',
           },
         ),
-        // Desenhando todas as rotas no mapa
         PolylineLayer(
           polylines: allRoutes.asMap().entries.map((entry) {
             final index = entry.key;
             final route = entry.value;
 
-            // Se for rota de retorno (após a Parada 7), desenhar em vermelho
-            final isReturnRoute = index >= 6; // Parada 7 tem índice 6
+            final isReturnRoute = index >= 6; // Se a rota for após a parada 7
             return Polyline(
               points: route,
               color: isReturnRoute
@@ -156,7 +197,6 @@ class MapView extends StatelessWidget {
         ),
         MarkerLayer(
           markers: coordinates.where((coord) {
-            // Remove as paradas 8 e 10
             return coord['tooltip'] != '9ª Parada' &&
                 coord['tooltip'] != '11ª Parada';
           }).map((coord) {
@@ -165,9 +205,7 @@ class MapView extends StatelessWidget {
               child: IconButton(
                 icon:
                     const Icon(Icons.location_on, size: 40, color: Colors.red),
-                onPressed: () {
-                  // Ação para cada marcador
-                },
+                onPressed: () {},
                 tooltip: coord['tooltip'],
               ),
             );
@@ -178,9 +216,7 @@ class MapView extends StatelessWidget {
                 child: IconButton(
                   icon: const Icon(Icons.directions_bus,
                       size: 40, color: Color.fromARGB(255, 2, 45, 80)),
-                  onPressed: () {
-                    // Ação ao clicar no ônibus
-                  },
+                  onPressed: () {},
                   tooltip: "Localização do ônibus",
                 ),
               ),
