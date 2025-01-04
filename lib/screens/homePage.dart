@@ -1,15 +1,12 @@
 import 'dart:convert';
-import 'package:http/http.dart'
-    as http; // Importando para fazer requisições HTTP
-import 'package:acesstrans/core/theme/app_themes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:speech_to_text/speech_recognition_result.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:acesstrans/Constants/coordinates.dart'; // Importando as coordenadas
+import 'package:acesstrans/Constants/coordinates.dart';
+import 'package:acesstrans/core/theme/app_themes.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,103 +16,70 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  FlutterTts flutterTts = FlutterTts();
-  final stt.SpeechToText _speechToText = stt.SpeechToText();
-  bool _isListening = false;
-  bool _speechEnabled = false;
-  String _lastWords = '';
-  LatLng _busLocation =
-      LatLng(-10.43029, -45.174006); // Localização inicial do ônibus
+  final FlutterTts flutterTts = FlutterTts();
+  LatLng _busLocation = LatLng(-10.43029, -45.174006);
+  List<List<LatLng>> _allRoutes =
+      []; // Lista contendo todas as rotas consecutivas
 
   @override
   void initState() {
     super.initState();
-    _initSpeech();
+    _loadInitialRoutes(); // Carrega as rotas ao iniciar
   }
 
-  // Função para pegar a localização do ônibus via API
-  Future<void> _fetchBusLocation() async {
-    final response = await http
-        .get(Uri.parse('https://api-location-teal.vercel.app/api/location'));
+  Future<void> _loadInitialRoutes() async {
+    try {
+      final routes = await fetchMultipleRoutes(coordinates);
+      setState(() {
+        _allRoutes = routes; // Atualiza todas as rotas consecutivas
+      });
+    } catch (e) {
+      print("Erro ao carregar rotas iniciais: $e");
+      _speak("Erro ao carregar as rotas iniciais.");
+    }
+  }
+
+  Future<List<List<LatLng>>> fetchMultipleRoutes(
+      List<Map<String, dynamic>> coordinates) async {
+    List<List<LatLng>> allRoutes = [];
+
+    for (int i = 0; i < coordinates.length - 1; i++) {
+      final start = coordinates[i]['location'];
+      final end = coordinates[i + 1]['location'];
+
+      try {
+        final route = await fetchRoute(start, end);
+        allRoutes.add(route);
+      } catch (e) {
+        print(
+            "Erro ao buscar rota de ${coordinates[i]['tooltip']} para ${coordinates[i + 1]['tooltip']}: $e");
+      }
+    }
+
+    return allRoutes;
+  }
+
+  Future<List<LatLng>> fetchRoute(LatLng start, LatLng end) async {
+    final apiKey = '5b3ce3597851110001cf6248362750b06b11431595a04b0687baea5a';
+    final url =
+        'https://api.openrouteservice.org/v2/directions/driving-car?api_key=$apiKey&start=${start.longitude},${start.latitude}&end=${end.longitude},${end.latitude}';
+    final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body); // Deserializa o JSON
-      print('Localização do ônibus recebida: $data');
+      final data = jsonDecode(response.body);
+      final List<LatLng> route =
+          (data['features'][0]['geometry']['coordinates'] as List)
+              .map((coord) => LatLng(coord[1], coord[0]))
+              .toList();
 
-      // Acessa a latitude e longitude dentro da chave 'location'
-      double latitude = data["location"]['latitude'];
-      double longitude = data["location"]['longitude'];
-
-      print('Latitude: $latitude, Longitude: $longitude');
-
-      // Verifica se as coordenadas são válidas antes de atualizar
-      if (latitude != null && longitude != null) {
-        setState(() {
-          _busLocation =
-              LatLng(latitude, longitude); // Atualiza a posição no mapa
-        });
-      } else {
-        print("Coordenadas inválidas recebidas da API.");
+      if (route.isEmpty) {
+        throw Exception('Nenhuma rota encontrada.');
       }
+
+      return route;
     } else {
-      print('Falha ao carregar a localização do ônibus');
+      throw Exception('Erro ao obter rota: ${response.statusCode}');
     }
-  }
-
-  void _initSpeech() async {
-    await _requestMicrophonePermission();
-
-    _speechEnabled = await _speechToText.initialize(
-      onError: (val) => print('Erro: $val'),
-      onStatus: (val) => print('Status: $val'),
-    );
-
-    if (_speechEnabled) {
-      setState(() {
-        _isListening = false;
-      });
-    } else {
-      print("O reconhecimento de fala não está disponível.");
-    }
-  }
-
-  Future<void> _requestMicrophonePermission() async {
-    var status = await Permission.microphone.request();
-    if (status.isDenied) {
-      print("Permissão para usar o microfone negada.");
-    }
-  }
-
-  void _startListening() async {
-    if (_speechEnabled) {
-      await _speechToText.listen(onResult: _onSpeechResult);
-      setState(() {
-        _isListening = true;
-      });
-    } else {
-      print("Speech recognition não está disponível.");
-    }
-  }
-
-  void _onSpeechResult(SpeechRecognitionResult result) {
-    setState(() {
-      _lastWords = result.recognizedWords.toLowerCase();
-    });
-
-    if (_lastWords.contains("busão")) {
-      _speak("Estou ouvindo, diga o nome da parada.");
-      _stopListening();
-      _startListening();
-    } else {
-      _respondToUser();
-    }
-  }
-
-  void _stopListening() async {
-    await _speechToText.stop();
-    setState(() {
-      _isListening = false;
-    });
   }
 
   Future<void> _speak(String text) async {
@@ -124,149 +88,105 @@ class _HomePageState extends State<HomePage> {
     await flutterTts.speak(text);
   }
 
-  void _respondToUser() {
-    String response;
-    var match = coordinates.firstWhere(
-      (coord) => _lastWords.contains(coord['tooltip'].toLowerCase()),
-      orElse: () => {},
-    );
-
-    if (match.isNotEmpty) {
-      int estimatedMinutes = 5; // Estimativa fixa, pode ser melhorada
-      response = "${match['tooltip']} está a $estimatedMinutes minutos.";
-      _speak(response);
-    } else if (_lastWords.isNotEmpty) {
-      _speak("Não entendi o destino. Tente novamente.");
-    }
-  }
-
-  @override
-  void dispose() {
-    flutterTts.stop();
-    _speechToText.stop();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppThemes.lightTheme.primaryColor,
-        title: Text('Mapa do Trajeto'),
-        actions: [
-          IconButton(
-            color: AppThemes.lightTheme.hintColor,
-            icon: Icon(_isListening ? Icons.mic_off : Icons.mic),
-            onPressed: _isListening ? _stopListening : _startListening,
-          ),
-        ],
-      ),
-      body: FlutterMap(
-        options: MapOptions(
-          initialCenter: _busLocation, // Centraliza no local inicial do ônibus
-          initialZoom: 13.0, // Zoom do mapa
-          maxZoom: 18.0, // Define o zoom máximo
+        title: const Text(
+          'Mapa do Trajeto',
+          style: TextStyle(fontSize: 24),
         ),
-        children: [
-          TileLayer(
-            urlTemplate:
-                "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-            subdomains: ['a', 'b', 'c'],
-          ),
-          MarkerLayer(
-            markers: coordinates.map((coord) {
-              return Marker(
-                point: coord['location'],
-                width: 50.0,
-                height: 50.0,
-                child: IconButton(
-                  icon: Image.network(
-                    'https://cdn-icons-png.flaticon.com/512/3448/3448339.png', // Ícone de ônibus
-                    width: 40,
-                    height: 40,
-                  ),
-                  onPressed: () {
-                    _speak("${coord['tooltip']}, ${coord['popup']}");
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return AlertDialog(
-                          backgroundColor:
-                              Theme.of(context).scaffoldBackgroundColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          title: Text(
-                            coord['tooltip'],
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color:
-                                  Theme.of(context).textTheme.bodyLarge?.color,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          content: Text(
-                            coord['popup'],
-                            style: TextStyle(
-                              fontSize: 20,
-                              color:
-                                  Theme.of(context).textTheme.bodyMedium?.color,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          actions: [
-                            Center(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Theme.of(context).primaryColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                                child: const Text(
-                                  "Fechar",
-                                  style: TextStyle(fontSize: 18),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                ),
-              );
-            }).toList()
-              ..add(
-                Marker(
-                  point: _busLocation, // A localização do ônibus
-                  width: 50.0,
-                  height: 50.0,
-                  child: IconButton(
-                    icon: Image.network(
-                      'https://cdn-icons-png.flaticon.com/512/3448/3448339.png', // Ícone de ônibus
-                      width: 40,
-                      height: 40,
-                    ),
-                    onPressed: () {
-                      _speak("A localização do ônibus foi atualizada.");
-                    },
-                  ),
-                ),
-              ),
-          ),
-        ],
+      ),
+      body: MapView(
+        busLocation: _busLocation,
+        allRoutes: _allRoutes, // Passa todas as rotas
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _fetchBusLocation(); // Atualiza a localização do ônibus
-        },
-        child: Icon(Icons.location_on),
+        onPressed: _loadInitialRoutes, // Recarregar as rotas
+        tooltip: "Recarregar rotas",
         backgroundColor: AppThemes.lightTheme.primaryColor,
+        child: const Icon(Icons.refresh),
       ),
+    );
+  }
+}
+
+class MapView extends StatelessWidget {
+  final LatLng busLocation;
+  final List<List<LatLng>> allRoutes; // Lista de todas as rotas
+
+  const MapView({
+    Key? key,
+    required this.busLocation,
+    required this.allRoutes,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: busLocation,
+        initialZoom: 13.0,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          subdomains: ['a', 'b', 'c'],
+          additionalOptions: const {
+            'attribution': '© OpenStreetMap',
+          },
+        ),
+        // Desenhando todas as rotas no mapa
+        PolylineLayer(
+          polylines: allRoutes.asMap().entries.map((entry) {
+            final index = entry.key;
+            final route = entry.value;
+
+            // Se for rota de retorno (após a Parada 7), desenhar em vermelho
+            final isReturnRoute = index >= 6; // Parada 7 tem índice 6
+            return Polyline(
+              points: route,
+              color: isReturnRoute
+                  ? const Color.fromARGB(255, 54, 244, 86)
+                  : Colors.blueAccent,
+              strokeWidth: 4.0,
+            );
+          }).toList(),
+        ),
+        MarkerLayer(
+          markers: coordinates.where((coord) {
+            // Remove as paradas 8 e 10
+            return coord['tooltip'] != '9ª Parada' &&
+                coord['tooltip'] != '11ª Parada';
+          }).map((coord) {
+            return Marker(
+              point: coord['location'],
+              child: IconButton(
+                icon:
+                    const Icon(Icons.location_on, size: 40, color: Colors.red),
+                onPressed: () {
+                  // Ação para cada marcador
+                },
+                tooltip: coord['tooltip'],
+              ),
+            );
+          }).toList()
+            ..add(
+              Marker(
+                point: busLocation,
+                child: IconButton(
+                  icon: const Icon(Icons.directions_bus,
+                      size: 40, color: Color.fromARGB(255, 2, 45, 80)),
+                  onPressed: () {
+                    // Ação ao clicar no ônibus
+                  },
+                  tooltip: "Localização do ônibus",
+                ),
+              ),
+            ),
+        ),
+      ],
     );
   }
 }

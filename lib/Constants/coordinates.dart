@@ -42,28 +42,43 @@ final List<Map<String, dynamic>> coordinates = [
     "popup": "Escola Municipal Orley Cavalcante Pacheco"
   },
   {
-    "location": const LatLng(-10.442140, -45.158292),
+    "location": const LatLng(-10.445252, -45.156963),
     "tooltip": "8ª Parada",
+    "popup": "15 Regional de Educação"
+  },
+  {
+    "location": const LatLng(-10.443384, -45.15574),
+    "tooltip": "9ª Parada",
+    "popup": "regional de educação"
+  },
+  {
+    "location": const LatLng(-10.442140, -45.158292),
+    "tooltip": "10ª Parada",
     "popup": "APAEB Corrente"
   },
   {
+    "location": const LatLng(-10.44027, -45.16258),
+    "tooltip": "11ª Parada",
+    "popup": "SAMU Corrente"
+  },
+  {
     "location": const LatLng(-10.439274, -45.162402),
-    "tooltip": "9ª Parada",
+    "tooltip": "12ª Parada",
     "popup": "SAMU Corrente"
   },
   {
     "location": const LatLng(-10.436220, -45.162002),
-    "tooltip": "10ª Parada",
+    "tooltip": "13ª Parada",
     "popup": "Próximo ao Coronel"
   },
   {
     "location": const LatLng(-10.429860, -45.161559),
-    "tooltip": "11ª Parada",
+    "tooltip": "14ª Parada",
     "popup": "Próximo ao posto Varejão"
   },
   {
     "location": const LatLng(-10.43029, -45.174006),
-    "tooltip": "12ª Parada",
+    "tooltip": "15ª Parada",
     "popup": "Retorno ao IFPI"
   },
 ];
