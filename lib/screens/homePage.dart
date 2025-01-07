@@ -136,6 +136,61 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  /// Função para calcular a distância entre duas coordenadas
+  double _calculateDistance(LatLng start, LatLng end) {
+    final Distance distance = Distance();
+    return distance.as(LengthUnit.Kilometer, start, end);
+  }
+
+  /// Função para estimar o tempo de chegada do ônibus em minutos
+  int _calculateTimeToArrival(LatLng busLocation, LatLng stopLocation) {
+    final distance = _calculateDistance(busLocation, stopLocation);
+    final averageSpeed = 40.0; // velocidade média em km/h
+    final timeInHours = distance / averageSpeed;
+    final timeInMinutes = (timeInHours * 60).round();
+    return timeInMinutes;
+  }
+
+  /// Função para mostrar o modal com o tempo de chegada
+  void _showTimeToArrivalModal(
+      LatLng stopLocation, String stopName, String popupDescription) {
+    final timeToArrival = _calculateTimeToArrival(_busLocation, stopLocation);
+
+    // Exibe o modal
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        _speak(
+            "Faltam $timeToArrival minutos para o ônibus chegar a $stopName, $popupDescription");
+
+        return AlertDialog(
+          backgroundColor: Colors.blue[900], // Mais contraste no fundo
+          title: Text(
+            'Tempo até $stopName',
+            style:
+                TextStyle(color: Colors.white), // Texto branco para contraste
+          ),
+          content: Text(
+            '$timeToArrival minutos restantes até a parada.\n\n$popupDescription',
+            style:
+                TextStyle(color: Colors.white), // Texto branco para contraste
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Fechar',
+                style: TextStyle(color: Colors.white), // Texto claro
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -149,6 +204,11 @@ class _HomePageState extends State<HomePage> {
       body: MapView(
         busLocation: _busLocation,
         allRoutes: _allRoutes, // Passa todas as rotas
+        onMarkerTapped:
+            (LatLng stopLocation, String stopName, String popupDescription) {
+          _showTimeToArrivalModal(
+              stopLocation, stopName, popupDescription); // Exibe o modal
+        },
       ),
     );
   }
@@ -156,12 +216,14 @@ class _HomePageState extends State<HomePage> {
 
 class MapView extends StatelessWidget {
   final LatLng busLocation;
-  final List<List<LatLng>> allRoutes; // Lista de todas as rotas
+  final List<List<LatLng>> allRoutes;
+  final Function(LatLng, String, String) onMarkerTapped;
 
   const MapView({
     Key? key,
     required this.busLocation,
     required this.allRoutes,
+    required this.onMarkerTapped,
   }) : super(key: key);
 
   @override
@@ -203,9 +265,15 @@ class MapView extends StatelessWidget {
             return Marker(
               point: coord['location'],
               child: IconButton(
-                icon:
-                    const Icon(Icons.location_on, size: 40, color: Colors.red),
-                onPressed: () {},
+                icon: const Icon(
+                  Icons.location_on,
+                  size: 60, // Ícone maior para acessibilidade
+                  color: Colors.red,
+                ),
+                onPressed: () {
+                  onMarkerTapped(coord['location'], coord['tooltip'],
+                      coord['popup']); // Chama a função ao clicar
+                },
                 tooltip: coord['tooltip'],
               ),
             );
@@ -214,8 +282,11 @@ class MapView extends StatelessWidget {
               Marker(
                 point: busLocation,
                 child: IconButton(
-                  icon: const Icon(Icons.directions_bus,
-                      size: 40, color: Color.fromARGB(255, 2, 45, 80)),
+                  icon: const Icon(
+                    Icons.directions_bus,
+                    size: 60, // Ícone maior para acessibilidade
+                    color: Color.fromARGB(255, 2, 45, 80),
+                  ),
                   onPressed: () {},
                   tooltip: "Localização do ônibus",
                 ),
