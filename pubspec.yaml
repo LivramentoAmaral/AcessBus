@@ -49,20 +49,21 @@ dependencies:
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.4.2
   geolocator: ^13.0.1
+  location: ^7.0.1
 
 flutter_native_splash:
   color: "#ffffff"
-  image: "assets/icon/AcessTrans.png"
+  image: "assets/icon/acessbus.png"  
   android: true
   ios: true
 
 
 flutter_icons:
-  android: "launcher_icon"
+  android: true
   ios: true
   remove_alpha_ios: true
-  image_path: "assets/icon/AcessTrans.png"
-  adaptive_icon_foreground: "assets/icon/AcessTrans.png"
+  image_path: "assets/icon/acessbus.png"
+  adaptive_icon_foreground: "assets/icon/acessbus.png"  
   min_sdk_android: 21 # android min sdk min:16, default 21
 
 dev_dependencies:
