@@ -97,12 +97,45 @@ class _MapViewState extends State<MapView> {
     if (!_isListening && await _speechToText.initialize()) {
       setState(() => _isListening = true);
 
-      _speechToText.listen(onResult: (result) {
-        if (result.recognizedWords.toLowerCase().contains("busão")) {
-          _speakTimeToArrival();
+      _speechToText.listen(onResult: (result) async {
+        if (result.recognizedWords.toLowerCase().contains("ônibus")) {
+          _speakCombinedInformation();
         }
       });
     }
+  }
+
+  void _speakCombinedInformation() async {
+    if (_currentLocation == null) {
+      await _speakMessage("Não foi possível determinar sua localização.");
+      return;
+    }
+
+    final nearestStop = _findNearestStop();
+    if (nearestStop == null) {
+      await _speakMessage("Não foi possível determinar a parada mais próxima.");
+      return;
+    }
+
+    final stopName = nearestStop['tooltip'];
+    final stopLocation = nearestStop['location'];
+    final distance = _calculateDistance(
+      LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
+      stopLocation,
+    );
+
+    const busSpeedKmPerHour = 40; // Velocidade média do ônibus
+    final busDistance = _calculateDistance(widget.busLocation, stopLocation);
+    final timeToArrival =
+        (busDistance / busSpeedKmPerHour) * 60; // Tempo em minutos
+
+    // Criamos uma única mensagem para evitar sobreposição
+    final message = """
+    A parada mais próxima é $stopName, localizada a aproximadamente ${distance.toStringAsFixed(2)} quilômetros.
+    O ônibus chegará a essa parada em cerca de ${timeToArrival.toStringAsFixed(1)} minutos.
+  """;
+
+    await _speakMessage(message);
   }
 
   void _stopListening() async {
@@ -220,11 +253,13 @@ class _MapViewState extends State<MapView> {
                 return Polyline(
                   points: route,
                   color: isReturnRoute
-                      ? const Color.fromARGB(255, 54, 244, 86)
-                      : Colors.blueAccent,
+                      ? const Color.fromARGB(
+                          150, 54, 244, 86) // Verde translúcido
+                      : Colors.blueAccent.withOpacity(0.6), // Azul translúcido
                   strokeWidth: 6.0,
-                  borderColor: Colors.white,
-                  borderStrokeWidth: 2.0, // Borda suave nas rotas
+                  borderColor:
+                      Colors.white.withOpacity(0.0), // Remove a borda branca
+                  borderStrokeWidth: 0.0, // Borda suave nas rotas
                 );
               }).toList(),
             ),
@@ -235,24 +270,34 @@ class _MapViewState extends State<MapView> {
               }).map((coord) {
                 return Marker(
                   point: coord['location'],
+                  width: 48, // Área de toque mínima recomendada
+                  height: 48,
                   child: GestureDetector(
                     onTap: () {
                       widget.onMarkerTapped(
                           coord['location'], coord['tooltip'], coord['popup']);
                     },
-                    child: Container(
-                      width: 100, // Largura do marcador
-                      height: 100, // Altura do marcador
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.blueAccent.withOpacity(0.0),
-                      ),
-                      child: const Center(
-                        // Garante que o ícone fique centralizado
-                        child: Icon(
-                          Icons.location_on,
-                          size: 50, // Tamanho do ícone
-                          color: Colors.redAccent,
+                    child: Semantics(
+                      label: "Parada ${coord['tooltip']}",
+                      button: true,
+                      child: Tooltip(
+                        message: "Parada: ${coord['tooltip']}",
+                        child: Container(
+                          width:
+                              48, // Garante que a área de toque seja acessível
+                          height: 48,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color:
+                                Colors.transparent, // Mantém sem fundo visível
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.location_on,
+                              size: 36, // Mantém um ícone grande e visível
+                              color: Colors.redAccent,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -301,6 +346,7 @@ class _MapViewState extends State<MapView> {
                 child: const Icon(
                   Icons.my_location,
                   color: Color.fromARGB(255, 190, 74, 74),
+                  semanticLabel: "Centralizar no ônibus",
                 ),
               ),
               const SizedBox(height: 10),
@@ -311,6 +357,7 @@ class _MapViewState extends State<MapView> {
                 child: const Icon(
                   Icons.record_voice_over,
                   color: Colors.white,
+                  semanticLabel: "Falar parada mais próxima",
                 ),
                 elevation: 8,
                 shape: RoundedRectangleBorder(
@@ -325,6 +372,7 @@ class _MapViewState extends State<MapView> {
                 child: const Icon(
                   Icons.directions_bus,
                   color: Colors.white,
+                  semanticLabel: "Falar tempo de chegada",
                 ),
                 elevation: 8,
                 shape: RoundedRectangleBorder(
@@ -337,10 +385,20 @@ class _MapViewState extends State<MapView> {
         Positioned(
           top: 40,
           right: 20,
-          child: FloatingActionButton(
-            onPressed: _isListening ? _stopListening : _startListening,
-            backgroundColor: Colors.redAccent,
-            child: Icon(_isListening ? Icons.mic_off : Icons.mic),
+          child: Semantics(
+            label: _isListening
+                ? "Parar reconhecimento de voz"
+                : "Iniciar reconhecimento de voz",
+            button: true, // Indica que é um botão interativo
+            child: FloatingActionButton(
+              onPressed: _isListening ? _stopListening : _startListening,
+              backgroundColor: Colors.redAccent,
+              child: Icon(
+                _isListening ? Icons.mic_off : Icons.mic,
+                semanticLabel:
+                    _isListening ? "Parar microfone" : "Iniciar microfone",
+              ),
+            ),
           ),
         ),
       ],
